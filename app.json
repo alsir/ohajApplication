@@ -19,8 +19,6 @@
         "NSLocationAlwaysUsageDescription": "This app needs your location to send it to the server every minute.",
         "UIBackgroundModes": [
           "location",
-          "fetch",
-          "location",
           "fetch"
         ],
         "ITSAppUsesNonExemptEncryption": false
