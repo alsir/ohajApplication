@@ -17,8 +17,15 @@
         "NSLocationWhenInUseUsageDescription": "This app needs your location to send it to the server every minute.",
         "NSLocationAlwaysAndWhenInUseUsageDescription": "This app needs your location in the background to keep sending it every minute.",
         "NSLocationAlwaysUsageDescription": "This app needs your location to send it to the server every minute.",
-        "UIBackgroundModes": ["location", "fetch"]
-      }
+        "UIBackgroundModes": [
+          "location",
+          "fetch",
+          "location",
+          "fetch"
+        ],
+        "ITSAppUsesNonExemptEncryption": false
+      },
+      "bundleIdentifier": "com.ohaj.transportation"
     },
     "android": {
       "package": "com.ohaj.transportation",
