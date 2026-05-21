@@ -47,7 +47,16 @@
     },
     "owner": "alsiradil",
     "plugins": [
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "This app needs your location to send it to the server every minute.",
+          "locationAlwaysPermission": "This app needs your location in the background to keep sending it every minute.",
+          "isIosBackgroundLocationEnabled": true,
+          "isAndroidBackgroundLocationEnabled": true
+        }
+      ]
     ]
   }
 }

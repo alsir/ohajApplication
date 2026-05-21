@@ -3,11 +3,12 @@ import * as TaskManager from 'expo-task-manager';
 import * as SecureStore from 'expo-secure-store';
 import axios from 'axios';
 
-const SERVER_ENDPOINT = 'https://ohaj.alsirhamory.com/api/car-location';
-const LOCATION_TASK   = 'ohaj-bg-location';
-const CAR_KEY         = 'ohaj_car';
-const HISTORY_KEY     = 'ohaj_history';
-const SEND_INTERVAL   = 60_000;
+const SERVER_ENDPOINT  = 'https://ohaj.alsirhamory.com/api/car-location';
+const LOCATION_TASK    = 'ohaj-bg-location';
+const CAR_KEY          = 'ohaj_car';
+const HISTORY_KEY      = 'ohaj_history';
+const SEND_INTERVAL    = 60_000;
+const REQUEST_TIMEOUT  = 15_000;
 
 export interface LocationRecord {
   id: string;
@@ -28,41 +29,48 @@ function notifyStatus(r: boolean) { statusListeners.forEach(cb => cb(r)); }
 
 // Background task — must be defined at module level before the app renders
 TaskManager.defineTask(LOCATION_TASK, async ({ data, error }) => {
-  if (error) { console.warn('[bg-task]', (error as any).message); return; }
-  const loc = (data as any)?.locations?.[0] as Location.LocationObject | undefined;
-  if (!loc) return;
-
-  const carNumber = await SecureStore.getItemAsync(CAR_KEY).catch(() => null);
-  if (!carNumber) return;
-
-  const record: LocationRecord = {
-    id:        `${Date.now()}`,
-    carNumber,
-    latitude:  loc.coords.latitude,
-    longitude: loc.coords.longitude,
-    accuracy:  loc.coords.accuracy,
-    timestamp: loc.timestamp,
-    sentAt:    new Date().toISOString(),
-  };
-
   try {
-    await axios.post(SERVER_ENDPOINT, {
-      carNumber: record.carNumber,
-      latitude:  record.latitude,
-      longitude: record.longitude,
-    });
-  } catch (err: any) {
-    console.warn('[bg-task] POST error', err?.message);
+    if (error) { console.warn('[bg-task]', (error as any).message); return; }
+    const loc = (data as any)?.locations?.[0] as Location.LocationObject | undefined;
+    if (!loc) return;
+
+    const carNumber = await SecureStore.getItemAsync(CAR_KEY).catch(() => null);
+    if (!carNumber) return;
+
+    const record: LocationRecord = {
+      id:        `${Date.now()}`,
+      carNumber,
+      latitude:  loc.coords.latitude,
+      longitude: loc.coords.longitude,
+      accuracy:  loc.coords.accuracy,
+      timestamp: loc.timestamp,
+      sentAt:    new Date().toISOString(),
+    };
+
+    try {
+      await axios.post(
+        SERVER_ENDPOINT,
+        { carNumber: record.carNumber, latitude: record.latitude, longitude: record.longitude },
+        { timeout: REQUEST_TIMEOUT },
+      );
+    } catch (err: any) {
+      console.warn('[bg-task] POST error', err?.message);
+    }
+
+    try {
+      const raw = await SecureStore.getItemAsync(HISTORY_KEY);
+      const hist: LocationRecord[] = raw ? JSON.parse(raw) : [];
+      const updated = [record, ...hist].slice(0, 50);
+      await SecureStore.setItemAsync(HISTORY_KEY, JSON.stringify(updated));
+      // locationHistory lives in the foreground JS context; update only if reachable
+      if (historyListeners.length > 0) {
+        locationHistory = updated;
+        notifyHistory();
+      }
+    } catch {}
+  } catch (outerErr: any) {
+    console.warn('[bg-task] unhandled error', outerErr?.message);
   }
-
-  try {
-    const raw = await SecureStore.getItemAsync(HISTORY_KEY);
-    const hist: LocationRecord[] = raw ? JSON.parse(raw) : [];
-    const updated = [record, ...hist].slice(0, 50);
-    await SecureStore.setItemAsync(HISTORY_KEY, JSON.stringify(updated));
-    locationHistory = updated;
-    notifyHistory();
-  } catch {}
 });
 
 export async function requestPermissions(): Promise<boolean> {
@@ -73,19 +81,20 @@ export async function requestPermissions(): Promise<boolean> {
 }
 
 export async function startTracking(carNumber: string): Promise<boolean> {
-  const granted = await requestPermissions();
-  if (!granted) return false;
-
-  await SecureStore.setItemAsync(CAR_KEY, carNumber);
-
   try {
-    const raw = await SecureStore.getItemAsync(HISTORY_KEY);
-    if (raw) locationHistory = JSON.parse(raw);
-  } catch {}
+    const granted = await requestPermissions();
+    if (!granted) return false;
 
-  const alreadyRunning = await Location.hasStartedLocationUpdatesAsync(LOCATION_TASK).catch(() => false);
-  if (!alreadyRunning) {
-    await Location.startLocationUpdatesAsync(LOCATION_TASK, {
+    await SecureStore.setItemAsync(CAR_KEY, carNumber);
+
+    try {
+      const raw = await SecureStore.getItemAsync(HISTORY_KEY);
+      if (raw) locationHistory = JSON.parse(raw);
+    } catch {}
+
+    const alreadyRunning = await Location.hasStartedLocationUpdatesAsync(LOCATION_TASK).catch(() => false);
+    if (!alreadyRunning) {
+      await Location.startLocationUpdatesAsync(LOCATION_TASK, {
       accuracy:                         Location.Accuracy.Balanced,
       timeInterval:                     SEND_INTERVAL,
       distanceInterval:                 0,
@@ -97,17 +106,26 @@ export async function startTracking(carNumber: string): Promise<boolean> {
         notificationColor: '#1a6ef0',
       },
     });
-  }
+    }
 
-  notifyStatus(true);
-  return true;
+    notifyStatus(true);
+    return true;
+  } catch (err: any) {
+    console.warn('[startTracking] error', err?.message);
+    return false;
+  }
 }
 
 export async function stopTracking(): Promise<void> {
-  const running = await Location.hasStartedLocationUpdatesAsync(LOCATION_TASK).catch(() => false);
-  if (running) await Location.stopLocationUpdatesAsync(LOCATION_TASK);
-  await SecureStore.deleteItemAsync(CAR_KEY).catch(() => {});
-  notifyStatus(false);
+  try {
+    const running = await Location.hasStartedLocationUpdatesAsync(LOCATION_TASK).catch(() => false);
+    if (running) await Location.stopLocationUpdatesAsync(LOCATION_TASK).catch(() => {});
+    await SecureStore.deleteItemAsync(CAR_KEY).catch(() => {});
+  } catch (err: any) {
+    console.warn('[stopTracking] error', err?.message);
+  } finally {
+    notifyStatus(false);
+  }
 }
 
 export async function isTracking(): Promise<boolean> {
