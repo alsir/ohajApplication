@@ -1,0 +1,45 @@
+{
+  "expo": {
+    "name": "ohajApplication",
+    "slug": "ohajApplication",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "This app needs your location to send it to the server every minute.",
+        "NSLocationAlwaysUsageDescription": "This app needs your location to send it to the server every minute."
+      }
+    },
+    "android": {
+      "package": "com.ohaj.transportation",
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "permissions": [
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION"
+      ],
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "94ab321f-73c1-432a-8d4d-a1194119fa12"
+      }
+    },
+    "owner": "alsiradil"
+  }
+}
