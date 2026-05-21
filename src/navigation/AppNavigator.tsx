@@ -1,7 +1,7 @@
 import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { Text } from 'react-native';
+import { Text, View, StyleSheet } from 'react-native';
 
 import HomeScreen from '../screens/HomeScreen';
 import MapScreen from '../screens/MapScreen';
@@ -9,10 +9,10 @@ import HistoryScreen from '../screens/HistoryScreen';
 
 const Tab = createBottomTabNavigator();
 
-const ICONS: Record<string, string> = {
-  Home: '🏠',
-  Map: '🗺️',
-  History: '📋',
+const TABS: Record<string, { icon: string; label: string }> = {
+  Home:    { icon: '🏠', label: 'الرئيسية' },
+  Map:     { icon: '🗺️', label: 'الخريطة' },
+  History: { icon: '📋', label: 'السجل' },
 };
 
 export default function AppNavigator() {
@@ -20,20 +20,41 @@ export default function AppNavigator() {
     <NavigationContainer>
       <Tab.Navigator
         screenOptions={({ route }) => ({
-          tabBarIcon: () => (
-            <Text style={{ fontSize: 20 }}>{ICONS[route.name]}</Text>
+          tabBarIcon: ({ focused }) => (
+            <Text style={{ fontSize: 22, opacity: focused ? 1 : 0.45 }}>{TABS[route.name].icon}</Text>
           ),
-          headerStyle: { backgroundColor: '#2563eb' },
+          tabBarLabel: ({ focused }) => (
+            <Text style={[
+              tabStyles.label,
+              focused ? tabStyles.labelActive : tabStyles.labelInactive,
+            ]}>{TABS[route.name].label}</Text>
+          ),
+          tabBarStyle: tabStyles.bar,
+          tabBarItemStyle: tabStyles.item,
+          headerStyle: { backgroundColor: '#0d1b2a', borderBottomWidth: 0, elevation: 0, shadowOpacity: 0 },
           headerTintColor: '#fff',
-          headerTitleStyle: { fontWeight: '700' },
-          tabBarActiveTintColor: '#2563eb',
-          tabBarInactiveTintColor: '#999',
+          headerTitleStyle: { fontWeight: '800', fontSize: 16 },
+          headerTitleAlign: 'center',
         })}
       >
         <Tab.Screen name="Home" component={HomeScreen} options={{ headerShown: false }} />
-        <Tab.Screen name="Map" component={MapScreen} />
-        <Tab.Screen name="History" component={HistoryScreen} />
+        <Tab.Screen name="Map" component={MapScreen} options={{ title: 'الخريطة' }} />
+        <Tab.Screen name="History" component={HistoryScreen} options={{ title: 'سجل المواقع' }} />
       </Tab.Navigator>
     </NavigationContainer>
   );
 }
+
+const tabStyles = StyleSheet.create({
+  bar: {
+    backgroundColor: '#0d1b2a',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.08)',
+    height: 70,
+    paddingBottom: 10,
+  },
+  item: { paddingTop: 8 },
+  label: { fontSize: 11, fontWeight: '600', marginTop: 2 },
+  labelActive: { color: '#38bdf8' },
+  labelInactive: { color: 'rgba(255,255,255,0.30)' },
+});
