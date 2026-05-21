@@ -1,15 +1,14 @@
 import * as Location from 'expo-location';
+import * as TaskManager from 'expo-task-manager';
+import * as SecureStore from 'expo-secure-store';
 import axios from 'axios';
 
-// ────────────────────────────────────────────────────────────────────────────
-// Configuration
-// ────────────────────────────────────────────────────────────────────────────
 const SERVER_ENDPOINT = 'https://ohaj.alsirhamory.com/api/car-location';
-const SEND_INTERVAL_MS = 60_000; // 1 minute
+const LOCATION_TASK   = 'ohaj-bg-location';
+const CAR_KEY         = 'ohaj_car';
+const HISTORY_KEY     = 'ohaj_history';
+const SEND_INTERVAL   = 60_000;
 
-// ────────────────────────────────────────────────────────────────────────────
-// Types
-// ────────────────────────────────────────────────────────────────────────────
 export interface LocationRecord {
   id: string;
   carNumber: string;
@@ -20,119 +19,118 @@ export interface LocationRecord {
   sentAt: string;
 }
 
-// ────────────────────────────────────────────────────────────────────────────
-// Module-level state
-// ────────────────────────────────────────────────────────────────────────────
-let intervalId: ReturnType<typeof setInterval> | null = null;
-let activeCarNumber = '';
 const historyListeners: Array<(records: LocationRecord[]) => void> = [];
-const statusListeners: Array<(running: boolean) => void> = [];
+const statusListeners:  Array<(running: boolean) => void>          = [];
 let locationHistory: LocationRecord[] = [];
 
-// ────────────────────────────────────────────────────────────────────────────
-// Helpers
-// ────────────────────────────────────────────────────────────────────────────
-function notifyHistory() {
-  historyListeners.forEach((cb) => cb([...locationHistory]));
-}
+function notifyHistory() { historyListeners.forEach(cb => cb([...locationHistory])); }
+function notifyStatus(r: boolean) { statusListeners.forEach(cb => cb(r)); }
 
-function notifyStatus(running: boolean) {
-  statusListeners.forEach((cb) => cb(running));
-}
+// Background task — must be defined at module level before the app renders
+TaskManager.defineTask(LOCATION_TASK, async ({ data, error }) => {
+  if (error) { console.warn('[bg-task]', (error as any).message); return; }
+  const loc = (data as any)?.locations?.[0] as Location.LocationObject | undefined;
+  if (!loc) return;
 
-async function fetchAndSend(carNumber: string): Promise<LocationRecord | null> {
+  const carNumber = await SecureStore.getItemAsync(CAR_KEY).catch(() => null);
+  if (!carNumber) return;
+
+  const record: LocationRecord = {
+    id:        `${Date.now()}`,
+    carNumber,
+    latitude:  loc.coords.latitude,
+    longitude: loc.coords.longitude,
+    accuracy:  loc.coords.accuracy,
+    timestamp: loc.timestamp,
+    sentAt:    new Date().toISOString(),
+  };
+
   try {
-    const loc = await Location.getCurrentPositionAsync({
-      accuracy: Location.Accuracy.High,
+    await axios.post(SERVER_ENDPOINT, {
+      carNumber: record.carNumber,
+      latitude:  record.latitude,
+      longitude: record.longitude,
     });
-
-    const record: LocationRecord = {
-      id: `${Date.now()}`,
-      carNumber,
-      latitude: loc.coords.latitude,
-      longitude: loc.coords.longitude,
-      accuracy: loc.coords.accuracy,
-      timestamp: loc.timestamp,
-      sentAt: new Date().toISOString(),
-    };
-
-    axios
-      .post(SERVER_ENDPOINT, {
-        carNumber: record.carNumber,
-        latitude: record.latitude,
-        longitude: record.longitude,
-      })
-      .catch((err) => console.warn('[locationService] POST error', err?.message));
-
-    locationHistory = [record, ...locationHistory].slice(0, 50);
-    notifyHistory();
-    return record;
-  } catch (err) {
-    console.warn('[locationService] fetchAndSend error', err);
-    return null;
+  } catch (err: any) {
+    console.warn('[bg-task] POST error', err?.message);
   }
-}
 
-/** Send location once with the given carNumber (triggered from modal). */
-export async function sendLocationOnce(
-  carNumber: string,
-): Promise<LocationRecord | null> {
-  const granted = await requestPermissions();
-  if (!granted) return null;
-  return fetchAndSend(carNumber);
-}
+  try {
+    const raw = await SecureStore.getItemAsync(HISTORY_KEY);
+    const hist: LocationRecord[] = raw ? JSON.parse(raw) : [];
+    const updated = [record, ...hist].slice(0, 50);
+    await SecureStore.setItemAsync(HISTORY_KEY, JSON.stringify(updated));
+    locationHistory = updated;
+    notifyHistory();
+  } catch {}
+});
 
-// ────────────────────────────────────────────────────────────────────────────
-// Public API
-// ────────────────────────────────────────────────────────────────────────────
 export async function requestPermissions(): Promise<boolean> {
-  const { status } = await Location.requestForegroundPermissionsAsync();
-  return status === 'granted';
+  const fg = await Location.requestForegroundPermissionsAsync();
+  if (fg.status !== 'granted') return false;
+  const bg = await Location.requestBackgroundPermissionsAsync();
+  return bg.status === 'granted';
 }
 
 export async function startTracking(carNumber: string): Promise<boolean> {
-  if (intervalId !== null) stopTracking();
-
   const granted = await requestPermissions();
   if (!granted) return false;
 
-  activeCarNumber = carNumber;
-  await fetchAndSend(carNumber);
-  intervalId = setInterval(() => fetchAndSend(activeCarNumber), SEND_INTERVAL_MS);
+  await SecureStore.setItemAsync(CAR_KEY, carNumber);
+
+  try {
+    const raw = await SecureStore.getItemAsync(HISTORY_KEY);
+    if (raw) locationHistory = JSON.parse(raw);
+  } catch {}
+
+  const alreadyRunning = await Location.hasStartedLocationUpdatesAsync(LOCATION_TASK).catch(() => false);
+  if (!alreadyRunning) {
+    await Location.startLocationUpdatesAsync(LOCATION_TASK, {
+      accuracy:                         Location.Accuracy.Balanced,
+      timeInterval:                     SEND_INTERVAL,
+      distanceInterval:                 0,
+      pausesUpdatesAutomatically:       false,
+      showsBackgroundLocationIndicator: true,
+      foregroundService: {
+        notificationTitle: '\u0623\u0648\u0647\u0627\u062c - \u062a\u062a\u0628\u0639 \u0627\u0644\u0645\u0631\u0643\u0628\u0629',
+        notificationBody:  '\u064a\u064f\u0631\u0633\u0644 \u0627\u0644\u0645\u0648\u0642\u0639 \u0643\u0644 \u062f\u0642\u064a\u0642\u0629',
+        notificationColor: '#1a6ef0',
+      },
+    });
+  }
+
   notifyStatus(true);
   return true;
 }
 
-export function stopTracking() {
-  if (intervalId !== null) {
-    clearInterval(intervalId);
-    intervalId = null;
-  }
+export async function stopTracking(): Promise<void> {
+  const running = await Location.hasStartedLocationUpdatesAsync(LOCATION_TASK).catch(() => false);
+  if (running) await Location.stopLocationUpdatesAsync(LOCATION_TASK);
+  await SecureStore.deleteItemAsync(CAR_KEY).catch(() => {});
   notifyStatus(false);
 }
 
-export function isTracking(): boolean {
-  return intervalId !== null;
+export async function isTracking(): Promise<boolean> {
+  return Location.hasStartedLocationUpdatesAsync(LOCATION_TASK).catch(() => false);
 }
 
 export function getHistory(): LocationRecord[] {
   return [...locationHistory];
 }
 
-export function onHistoryChange(
-  cb: (records: LocationRecord[]) => void,
-): () => void {
+export async function loadPersistedHistory(): Promise<void> {
+  try {
+    const raw = await SecureStore.getItemAsync(HISTORY_KEY);
+    if (raw) { locationHistory = JSON.parse(raw); notifyHistory(); }
+  } catch {}
+}
+
+export function onHistoryChange(cb: (records: LocationRecord[]) => void): () => void {
   historyListeners.push(cb);
-  return () => {
-    const idx = historyListeners.indexOf(cb);
-    if (idx !== -1) historyListeners.splice(idx, 1);
-  };
+  return () => { const i = historyListeners.indexOf(cb); if (i !== -1) historyListeners.splice(i, 1); };
 }
 
 export function onStatusChange(cb: (running: boolean) => void): () => void {
   statusListeners.push(cb);
-  return () => {
-    const idx = statusListeners.indexOf(cb);
-    if (idx !== -1) statusListeners.splice(idx, 1);
-  };
+  return () => { const i = statusListeners.indexOf(cb); if (i !== -1) statusListeners.splice(i, 1); };
 }

@@ -6,7 +6,7 @@ import {
   StyleSheet,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { onHistoryChange, getHistory, LocationRecord } from '../services/locationService';
+import { onHistoryChange, getHistory, loadPersistedHistory, LocationRecord } from '../services/locationService';
 
 function HistoryItem({ item, index }: { item: LocationRecord; index: number }) {
   const date = new Date(item.timestamp);
@@ -34,6 +34,7 @@ export default function HistoryScreen() {
   const [records, setRecords] = useState<LocationRecord[]>(getHistory);
 
   useEffect(() => {
+    loadPersistedHistory();
     const unsub = onHistoryChange(setRecords);
     return unsub;
   }, []);

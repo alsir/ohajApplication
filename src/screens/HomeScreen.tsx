@@ -20,10 +20,11 @@ import {
   stopTracking,
   isTracking,
   onStatusChange,
+  loadPersistedHistory,
 } from '../services/locationService';
 
 export default function HomeScreen() {
-  const [tracking, setTracking] = useState(isTracking());
+  const [tracking, setTracking] = useState(false);
   const [activeCarNumber, setActiveCarNumber] = useState('');
   const [modalVisible, setModalVisible] = useState(false);
   const [carNumber, setCarNumber] = useState('');
@@ -46,6 +47,9 @@ export default function HomeScreen() {
   }, [tracking]);
 
   useEffect(() => {
+    // Check if tracking was already running (e.g. after app restart)
+    isTracking().then(setTracking);
+    loadPersistedHistory();
     const unsub = onStatusChange(setTracking);
     return unsub;
   }, []);
@@ -89,7 +93,7 @@ export default function HomeScreen() {
   const handleEndJourney = () => {
     Alert.alert('إنهاء الرحلة', 'هل تريد إنهاء الرحلة وإيقاف إرسال الموقع؟', [
       { text: 'إلغاء', style: 'cancel' },
-      { text: 'إنهاء', style: 'destructive', onPress: () => { stopTracking(); setActiveCarNumber(''); } },
+      { text: 'إنهاء', style: 'destructive', onPress: () => { stopTracking().then(() => setActiveCarNumber('')); } },
     ]);
   };
 

@@ -4,14 +4,12 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Text, View, StyleSheet } from 'react-native';
 
 import HomeScreen from '../screens/HomeScreen';
-import MapScreen from '../screens/MapScreen';
 import HistoryScreen from '../screens/HistoryScreen';
 
 const Tab = createBottomTabNavigator();
 
 const TABS: Record<string, { icon: string; label: string }> = {
   Home:    { icon: '🏠', label: 'الرئيسية' },
-  Map:     { icon: '🗺️', label: 'الخريطة' },
   History: { icon: '📋', label: 'السجل' },
 };
 
@@ -38,7 +36,6 @@ export default function AppNavigator() {
         })}
       >
         <Tab.Screen name="Home" component={HomeScreen} options={{ headerShown: false }} />
-        <Tab.Screen name="Map" component={MapScreen} options={{ title: 'الخريطة' }} />
         <Tab.Screen name="History" component={HistoryScreen} options={{ title: 'سجل المواقع' }} />
       </Tab.Navigator>
     </NavigationContainer>

@@ -1,4 +1,6 @@
 import { registerRootComponent } from 'expo';
+// Import service early so TaskManager.defineTask runs before the app renders
+import './src/services/locationService';
 
 import App from './App';
 
