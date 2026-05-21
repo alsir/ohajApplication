@@ -10,8 +10,8 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
-  Image,
 } from 'react-native';
+import OhajLogo from '../../assets/ohaj.svg';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
   startTracking,
@@ -102,11 +102,7 @@ export default function HomeScreen() {
     <LinearGradient colors={['#e8f4fd', '#c8e6f9', '#a8d4f5']} style={styles.container}>
       {/* Logo */}
       <View style={styles.logoWrapper}>
-        <Image
-          source={require('../../assets/icon.png')}
-          style={styles.logo}
-          resizeMode="contain"
-        />
+        <OhajLogo width={72} height={72} />
         <Text style={styles.logoText}>مشروع أوهاج للنقل</Text>
       </View>
 
