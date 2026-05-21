@@ -4,7 +4,7 @@ import axios from 'axios';
 // ────────────────────────────────────────────────────────────────────────────
 // Configuration
 // ────────────────────────────────────────────────────────────────────────────
-const SERVER_ENDPOINT = 'http://ohaj.alsirhamory.com/car-location';
+const SERVER_ENDPOINT = 'https://ohaj.alsirhamory.com/api/car-location';
 const SEND_INTERVAL_MS = 60_000; // 1 minute
 
 // ────────────────────────────────────────────────────────────────────────────
