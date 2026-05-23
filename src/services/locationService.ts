@@ -1,9 +1,9 @@
 import * as Location from 'expo-location';
 import * as TaskManager from 'expo-task-manager';
 import * as SecureStore from 'expo-secure-store';
-import axios from 'axios';
+import apiClient from './apiClient';
 
-const SERVER_ENDPOINT  = 'https://ohaj.alsirhamory.com/api/car-location';
+const SERVER_ENDPOINT  = '/api/car-location';
 const LOCATION_TASK    = 'ohaj-bg-location';
 const CAR_KEY          = 'ohaj_car';
 const HISTORY_KEY      = 'ohaj_history';
@@ -48,7 +48,7 @@ TaskManager.defineTask(LOCATION_TASK, async ({ data, error }) => {
     };
 
     try {
-      await axios.post(
+      await apiClient.post(
         SERVER_ENDPOINT,
         { carNumber: record.carNumber, latitude: record.latitude, longitude: record.longitude },
         { timeout: REQUEST_TIMEOUT },

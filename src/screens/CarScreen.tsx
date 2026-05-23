@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -13,9 +13,8 @@ import {
   ScrollView,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import axios from 'axios';
-
-const BASE_URL = 'https://ohaj.alsirhamory.com';
+import apiClient from '../services/apiClient';
+import { getDeviceId } from '../services/deviceId';
 const POLL_INTERVAL = 6000;   // check every 3 s
 const POLL_TIMEOUT  = 60000;  // give up after 60 s
 
@@ -34,6 +33,11 @@ export default function CarScreen() {
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Load device ID once on mount — not editable by the user
+  useEffect(() => {
+    getDeviceId().then(setMacAddress);
+  }, []);
+
   function stopPolling() {
     if (pollRef.current)   { clearInterval(pollRef.current);  pollRef.current   = null; }
     if (timeoutRef.current) { clearTimeout(timeoutRef.current); timeoutRef.current = null; }
@@ -41,21 +45,16 @@ export default function CarScreen() {
 
   async function handleConnect() {
     const trimmedCar = carNumber.trim();
-    const trimmedMac = macAddress.trim();
-    if (!trimmedCar || !trimmedMac) {
-      Alert.alert('خطأ', 'الرجاء إدخال رقم السيارة وعنوان MAC');
+    if (!trimmedCar) {
+      Alert.alert('خطأ', 'الرجاء إدخال رقم السيارة');
       return;
     }
 
     try {
       setConnecting(true);
 
-      // 1. Send connect request
-      await axios.post(
-        `${BASE_URL}/api/connect-to-car`,
-        { car_number: trimmedCar, mac_address: trimmedMac },
-        { timeout: 15000 },
-      );
+      // 1. Send connect request — mac_address is added automatically by apiClient interceptor
+      await apiClient.post('/api/connect-to-car', { car_number: trimmedCar });
 
       // 2. Poll is-connect until true or timeout
       let resolved = false;
@@ -72,8 +71,8 @@ export default function CarScreen() {
       pollRef.current = setInterval(async () => {
         if (resolved) return;
         try {
-          const res = await axios.get(`${BASE_URL}/api/is-connect`, {
-            params: { mac_address: trimmedMac },
+          const res = await apiClient.get('/api/is-connect', {
+            params: { car_number: trimmedCar },
             timeout: 10000,
           });
           const isConnected: boolean =
@@ -86,8 +85,8 @@ export default function CarScreen() {
             resolved = true;
             stopPolling();
 
-            // 3. Fetch car info
-            const infoRes = await axios.get(`${BASE_URL}/api/car-info`, {
+            // 3. Fetch car info — mac_address added automatically
+            const infoRes = await apiClient.get('/api/car-info', {
               params: { car_number: trimmedCar },
               timeout: 10000,
             });
@@ -110,7 +109,7 @@ export default function CarScreen() {
     stopPolling();
     setCarInfo(null);
     setCarNumber('');
-    setMacAddress('');
+    // macAddress (device ID) is kept — it never changes
   }
 
   return (
@@ -181,16 +180,12 @@ export default function CarScreen() {
               editable={!connecting}
             />
 
-            <Text style={styles.fieldLabel}>عنوان MAC</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="XX:XX:XX:XX:XX:XX"
-              placeholderTextColor="rgba(255,255,255,0.35)"
-              value={macAddress}
-              onChangeText={setMacAddress}
-              autoCapitalize="characters"
-              editable={!connecting}
-            />
+            <Text style={styles.fieldLabel}>معرّف الجهاز (MAC)</Text>
+            <View style={[styles.input, styles.inputReadOnly]}>
+              <Text style={styles.readOnlyText} numberOfLines={1}>
+                {macAddress || 'جارٍ التحميل…'}
+              </Text>
+            </View>
 
             {connecting ? (
               <View style={styles.loadingRow}>
@@ -299,6 +294,16 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.14)',
     marginBottom: 14,
     textAlign: 'right',
+  },
+  inputReadOnly: {
+    opacity: 0.55,
+    justifyContent: 'center',
+  },
+  readOnlyText: {
+    color: '#fff',
+    fontSize: 13,
+    textAlign: 'right',
+    letterSpacing: 0.5,
   },
   loadingRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, marginTop: 12 },
   loadingText: { color: '#38bdf8', fontSize: 14 },
