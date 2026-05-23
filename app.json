@@ -44,6 +44,7 @@
     "web": {
       "favicon": "./assets/favicon.png"
     },
+    "platforms": ["ios", "android"],
     "runtimeVersion": {
       "policy": "appVersion"
     },
