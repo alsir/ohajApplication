@@ -9,12 +9,14 @@ import {
   ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
+  Keyboard,
   Platform,
   ScrollView,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import apiClient from '../services/apiClient';
 import { getDeviceId } from '../services/deviceId';
+import { startTracking, stopTracking } from '../services/locationService';
 const POLL_INTERVAL = 6000;   // check every 3 s
 const POLL_TIMEOUT  = 60000;  // give up after 60 s
 
@@ -44,6 +46,7 @@ export default function CarScreen() {
   }
 
   async function handleConnect() {
+    Keyboard.dismiss();
     const trimmedCar = carNumber.trim();
     if (!trimmedCar) {
       Alert.alert('خطأ', 'الرجاء إدخال رقم السيارة');
@@ -90,9 +93,10 @@ export default function CarScreen() {
               params: { car_number: trimmedCar },
               timeout: 10000,
             });
-            setCarInfo(infoRes.data);
-            setConnecting(false);
+            await startTracking(trimmedCar);
             setModalVisible(false);
+            setConnecting(false);
+            setCarInfo(infoRes.data);
           }
         } catch (err: any) {
           console.warn('[is-connect poll]', err?.message);
@@ -107,6 +111,7 @@ export default function CarScreen() {
 
   function handleDisconnect() {
     stopPolling();
+    stopTracking();
     setCarInfo(null);
     setCarNumber('');
     // macAddress (device ID) is kept — it never changes
@@ -167,6 +172,10 @@ export default function CarScreen() {
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.modalOverlay}
         >
+          <ScrollView
+            keyboardShouldPersistTaps="handled"
+            scrollEnabled={false}
+          >
           <View style={styles.modalCard}>
             <Text style={styles.modalTitle}>بيانات السيارة</Text>
 
@@ -209,6 +218,7 @@ export default function CarScreen() {
               </View>
             )}
           </View>
+          </ScrollView>
         </KeyboardAvoidingView>
       </Modal>
     </LinearGradient>
