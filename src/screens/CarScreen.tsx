@@ -17,7 +17,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import apiClient from '../services/apiClient';
 import { getDeviceId } from '../services/deviceId';
 import { startTracking, stopTracking } from '../services/locationService';
-const POLL_INTERVAL = 6000;   // check every 3 s
+const POLL_INTERVAL = 6000;   // check every 6 s
 const POLL_TIMEOUT  = 60000;  // give up after 60 s
 
 interface CarInfo {
@@ -29,7 +29,7 @@ interface CarInfo {
 export default function CarScreen() {
   const [modalVisible, setModalVisible]   = useState(false);
   const [carNumber, setCarNumber]         = useState('');
-  const [macAddress, setMacAddress]       = useState('');
+  const [deviceId, setDeviceId]           = useState('');
   const [connecting, setConnecting]       = useState(false);
   const [carInfo, setCarInfo]             = useState<CarInfo | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -37,7 +37,7 @@ export default function CarScreen() {
 
   // Load device ID once on mount — not editable by the user
   useEffect(() => {
-    getDeviceId().then(setMacAddress);
+    getDeviceId().then(setDeviceId);
   }, []);
 
   function stopPolling() {
@@ -56,7 +56,7 @@ export default function CarScreen() {
     try {
       setConnecting(true);
 
-      // 1. Send connect request — mac_address is added automatically by apiClient interceptor
+      // 1. Send connect request with car number; ohaj_device_id is added by apiClient interceptor
       await apiClient.post('/api/connect-to-car', { car_number: trimmedCar });
 
       // 2. Poll is-connect until true or timeout
@@ -74,10 +74,7 @@ export default function CarScreen() {
       pollRef.current = setInterval(async () => {
         if (resolved) return;
         try {
-          const res = await apiClient.get('/api/is-connect', {
-            params: { car_number: trimmedCar },
-            timeout: 10000,
-          });
+          const res = await apiClient.get('/api/is-connect', { timeout: 10000 });
           const isConnected: boolean =
             res.data === true ||
             res.data?.connected === true ||
@@ -88,11 +85,8 @@ export default function CarScreen() {
             resolved = true;
             stopPolling();
 
-            // 3. Fetch car info — mac_address added automatically
-            const infoRes = await apiClient.get('/api/car-info', {
-              params: { car_number: trimmedCar },
-              timeout: 10000,
-            });
+            // 3. Fetch car info; ohaj_device_id is added in query by apiClient interceptor
+            const infoRes = await apiClient.get('/api/car-info', { timeout: 10000 });
             await startTracking(trimmedCar);
             setModalVisible(false);
             setConnecting(false);
@@ -114,7 +108,7 @@ export default function CarScreen() {
     stopTracking();
     setCarInfo(null);
     setCarNumber('');
-    // macAddress (device ID) is kept — it never changes
+    // Device ID is kept — it never changes
   }
 
   return (
@@ -189,10 +183,10 @@ export default function CarScreen() {
               editable={!connecting}
             />
 
-            <Text style={styles.fieldLabel}>معرّف الجهاز (MAC)</Text>
+            <Text style={styles.fieldLabel}>معرّف الجهاز</Text>
             <View style={[styles.input, styles.inputReadOnly]}>
               <Text style={styles.readOnlyText} numberOfLines={1}>
-                {macAddress || 'جارٍ التحميل…'}
+                {deviceId || 'جارٍ التحميل…'}
               </Text>
             </View>
 

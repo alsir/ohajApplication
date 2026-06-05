@@ -8,20 +8,20 @@ const apiClient = axios.create({
   timeout: 15000,
 });
 
-// Automatically attach mac_address (device ID) to every request
+// Automatically attach ohaj_device_id (device ID) to every request
 apiClient.interceptors.request.use(async (config) => {
   const deviceId = await getDeviceId();
 
   // Attach to POST/PUT/PATCH body
   if (config.data && typeof config.data === 'object') {
-    config.data = { ...config.data, mac_address: deviceId };
+    config.data = { ...config.data, ohaj_device_id: deviceId };
   } else if (config.method === 'post' || config.method === 'put' || config.method === 'patch') {
-    config.data = { mac_address: deviceId };
+    config.data = { ohaj_device_id: deviceId };
   }
 
   // Attach to GET/DELETE query params
   if (config.method === 'get' || config.method === 'delete') {
-    config.params = { ...config.params, mac_address: deviceId };
+    config.params = { ...config.params, ohaj_device_id: deviceId };
   }
 
   return config;
