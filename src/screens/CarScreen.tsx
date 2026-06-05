@@ -40,6 +40,35 @@ export default function CarScreen() {
     getDeviceId().then(setDeviceId);
   }, []);
 
+  // When screen opens, check existing connection and load car info if approved
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadConnectedCarInfo = async () => {
+      try {
+        const res = await apiClient.get('/api/is-connect', { timeout: 10000 });
+        const isConnected: boolean =
+          res.data === true ||
+          res.data?.connected === true ||
+          res.data?.is_connect === true ||
+          res.data?.status === true;
+
+        if (!isConnected || cancelled) return;
+
+        const infoRes = await apiClient.get('/api/car-info', { timeout: 10000 });
+        if (!cancelled) setCarInfo(infoRes.data);
+      } catch (err: any) {
+        console.warn('[car-screen init]', err?.message);
+      }
+    };
+
+    loadConnectedCarInfo();
+    return () => {
+      cancelled = true;
+      stopPolling();
+    };
+  }, []);
+
   function stopPolling() {
     if (pollRef.current)   { clearInterval(pollRef.current);  pollRef.current   = null; }
     if (timeoutRef.current) { clearTimeout(timeoutRef.current); timeoutRef.current = null; }
@@ -87,7 +116,7 @@ export default function CarScreen() {
 
             // 3. Fetch car info; ohaj_device_id is added in query by apiClient interceptor
             const infoRes = await apiClient.get('/api/car-info', { timeout: 10000 });
-            await startTracking(trimmedCar);
+            await startTracking(trimmedCar, '');
             setModalVisible(false);
             setConnecting(false);
             setCarInfo(infoRes.data);

@@ -6,6 +6,7 @@ import apiClient from './apiClient';
 const SERVER_ENDPOINT  = '/api/car-location';
 const LOCATION_TASK    = 'ohaj-bg-location';
 const CAR_KEY          = 'ohaj_car';
+const MANIFESTO_KEY    = 'ohaj_manifesto';
 const HISTORY_KEY      = 'ohaj_history';
 const SEND_INTERVAL    = 60_000;
 const REQUEST_TIMEOUT  = 15_000;
@@ -13,6 +14,7 @@ const REQUEST_TIMEOUT  = 15_000;
 export interface LocationRecord {
   id: string;
   carNumber: string;
+  manfistoNumber: string;
   latitude: number;
   longitude: number;
   accuracy: number | null;
@@ -27,6 +29,24 @@ let locationHistory: LocationRecord[] = [];
 function notifyHistory() { historyListeners.forEach(cb => cb([...locationHistory])); }
 function notifyStatus(r: boolean) { statusListeners.forEach(cb => cb(r)); }
 
+async function sendLocationUpdate(
+  carNumber: string,
+  manfistoNumber: string,
+  latitude: number,
+  longitude: number,
+): Promise<void> {
+  await apiClient.post(
+    SERVER_ENDPOINT,
+    {
+      car_number: carNumber,
+      manfisto_number: manfistoNumber,
+      latitude,
+      longitude,
+    },
+    { timeout: REQUEST_TIMEOUT },
+  );
+}
+
 // Background task — must be defined at module level before the app renders
 TaskManager.defineTask(LOCATION_TASK, async ({ data, error }) => {
   try {
@@ -35,11 +55,13 @@ TaskManager.defineTask(LOCATION_TASK, async ({ data, error }) => {
     if (!loc) return;
 
     const carNumber = await SecureStore.getItemAsync(CAR_KEY).catch(() => null);
+    const manfistoNumber = await SecureStore.getItemAsync(MANIFESTO_KEY).catch(() => null);
     if (!carNumber) return;
 
     const record: LocationRecord = {
       id:        `${Date.now()}`,
       carNumber,
+      manfistoNumber: manfistoNumber ?? '',
       latitude:  loc.coords.latitude,
       longitude: loc.coords.longitude,
       accuracy:  loc.coords.accuracy,
@@ -48,11 +70,7 @@ TaskManager.defineTask(LOCATION_TASK, async ({ data, error }) => {
     };
 
     try {
-      await apiClient.post(
-        SERVER_ENDPOINT,
-        { carNumber: record.carNumber, latitude: record.latitude, longitude: record.longitude },
-        { timeout: REQUEST_TIMEOUT },
-      );
+      await sendLocationUpdate(record.carNumber, record.manfistoNumber, record.latitude, record.longitude);
     } catch (err: any) {
       console.warn('[bg-task] POST error', err?.message);
     }
@@ -80,12 +98,21 @@ export async function requestPermissions(): Promise<boolean> {
   return bg.status === 'granted';
 }
 
-export async function startTracking(carNumber: string): Promise<boolean> {
+export async function startTracking(carNumber: string, manfistoNumber: string): Promise<boolean> {
   try {
     const granted = await requestPermissions();
     if (!granted) return false;
 
     await SecureStore.setItemAsync(CAR_KEY, carNumber);
+    await SecureStore.setItemAsync(MANIFESTO_KEY, manfistoNumber);
+
+    // Send current location immediately when the journey starts.
+    try {
+      const current = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+      await sendLocationUpdate(carNumber, manfistoNumber, current.coords.latitude, current.coords.longitude);
+    } catch (err: any) {
+      console.warn('[startTracking] immediate POST error', err?.message);
+    }
 
     try {
       const raw = await SecureStore.getItemAsync(HISTORY_KEY);
@@ -121,6 +148,7 @@ export async function stopTracking(): Promise<void> {
     const running = await Location.hasStartedLocationUpdatesAsync(LOCATION_TASK).catch(() => false);
     if (running) await Location.stopLocationUpdatesAsync(LOCATION_TASK).catch(() => {});
     await SecureStore.deleteItemAsync(CAR_KEY).catch(() => {});
+    await SecureStore.deleteItemAsync(MANIFESTO_KEY).catch(() => {});
   } catch (err: any) {
     console.warn('[stopTracking] error', err?.message);
   } finally {

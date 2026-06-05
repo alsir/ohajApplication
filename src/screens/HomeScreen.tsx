@@ -28,6 +28,7 @@ export default function HomeScreen() {
   const [activeCarNumber, setActiveCarNumber] = useState('');
   const [modalVisible, setModalVisible] = useState(false);
   const [carNumber, setCarNumber] = useState('');
+  const [manfistoNumber, setManfistoNumber] = useState('');
   const [loading, setLoading] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -72,13 +73,18 @@ export default function HomeScreen() {
     return [h, m, s].map((v) => String(v).padStart(2, '0')).join(':');
   };
 
-  const handleOpenModal = () => { setCarNumber(''); setModalVisible(true); };
+  const handleOpenModal = () => {
+    setCarNumber('');
+    setManfistoNumber('');
+    setModalVisible(true);
+  };
 
   const handleStartJourney = async () => {
     if (!carNumber.trim()) { Alert.alert('خطأ', 'يرجى إدخال رقم السيارة'); return; }
+    if (!manfistoNumber.trim()) { Alert.alert('خطأ', 'يرجى إدخال رقم المانفيستو'); return; }
     setLoading(true);
     try {
-      const ok = await startTracking(carNumber.trim());
+      const ok = await startTracking(carNumber.trim(), manfistoNumber.trim());
       if (!ok) {
         Alert.alert('خطأ', 'تعذّر الحصول على الموقع. تحقق من صلاحيات الموقع.');
       } else {
@@ -166,7 +172,7 @@ export default function HomeScreen() {
           <View style={styles.sheet}>
             <View style={styles.sheetHandle} />
             <Text style={styles.sheetTitle}>رقم المركبة</Text>
-            <Text style={styles.sheetSubtitle}>سيتم إرفاق رقم المركبة مع كل إرسال موقع</Text>
+            <Text style={styles.sheetSubtitle}>أدخل رقم المركبة ورقم المانفيستو</Text>
 
             <TextInput
               style={styles.input}
@@ -179,6 +185,17 @@ export default function HomeScreen() {
               returnKeyType="send"
               onSubmitEditing={handleStartJourney}
               autoFocus
+            />
+
+            <TextInput
+              style={styles.input}
+              placeholder="أدخل رقم المانفيستو…"
+              placeholderTextColor="#6b7a99"
+              value={manfistoNumber}
+              onChangeText={setManfistoNumber}
+              textAlign="right"
+              returnKeyType="send"
+              onSubmitEditing={handleStartJourney}
             />
 
             <TouchableOpacity onPress={handleStartJourney} disabled={loading} activeOpacity={0.88} style={styles.confirmWrap}>
