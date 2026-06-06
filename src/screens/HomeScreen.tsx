@@ -174,7 +174,7 @@ export default function HomeScreen() {
             <Text style={styles.sheetTitle}>رقم المركبة</Text>
             <Text style={styles.sheetSubtitle}>أدخل رقم المركبة ورقم المانفيستو</Text>
 
-            <TextInput
+            {/* <TextInput
               style={styles.input}
               placeholder="أدخل رقم السيارة…"
               placeholderTextColor="#6b7a99"
@@ -185,7 +185,7 @@ export default function HomeScreen() {
               returnKeyType="send"
               onSubmitEditing={handleStartJourney}
               autoFocus
-            />
+            /> */}
 
             <TextInput
               style={styles.input}

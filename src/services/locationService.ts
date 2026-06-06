@@ -38,7 +38,7 @@ async function sendLocationUpdate(
   await apiClient.post(
     SERVER_ENDPOINT,
     {
-      car_number: carNumber,
+      // car_number: carNumber,
       manfisto_number: manfistoNumber,
       latitude,
       longitude,
